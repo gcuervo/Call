@@ -1,44 +1,57 @@
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.*;
+import java.util.logging.Logger;
 
 public class Dispatcher {
 
-    private ExecutorService executor;
-    private BlockingQueue waitingCalls;
+  private ExecutorService executor;
+  private BlockingQueue<Call> waitingCalls;
+  private EmployeeBusiness employeeBusiness;
+  private ConcurrentLinkedQueue<Call> receiveCalls;
 
-    private List<Director> directors;
-    private List<Operator> operators;
-    private List<Supervisor> supervisors;
+  private Logger logger = Logger.getLogger(Dispatcher.class.getName());
 
-    public Dispatcher(Integer threads) {
-        executor = Executors.newFixedThreadPool(threads);
-        waitingCalls = new LinkedBlockingQueue();
+  public Dispatcher(Integer threads) {
+    executor = Executors.newFixedThreadPool(threads);
+    waitingCalls = new LinkedBlockingQueue<Call>();
+    employeeBusiness = new EmployeeBusiness();
+  }
 
-        directors = new ArrayList<Director>();
-        operators = new ArrayList<Operator>();
-        supervisors = new ArrayList<Supervisor>();
+  public void ready(List<Call> calls) {
+    receiveCalls.addAll(calls);
+  }
 
+  public void addCall(Call call) {
+    receiveCalls.add(call);
+  }
+
+  public void dispatchCall(final Employee employee, final Call call) {
+    executor.execute(
+        new Runnable() {
+          public void run() {
+            System.out.println("entro ");
+            employee.answerCall(call);
+            waitingCalls();
+          }
+        });
+  }
+
+  private void waitingCalls() {
+    if (waitingCalls.isEmpty()) {
+      executor.shutdown();
     }
+    Call call = waitingCalls.remove();
+    callHandler(call);
+  }
 
-    private void employ(Long cantDir, Long cantSup, Long cantOp) {
-        int index = 0;
-
-        while (index < cantDir) {
-            directors.add(new Director("Director " + String.valueOf(index++)));
-        }
-        index = 0;
-        while (index < cantSup) {
-            supervisors.add(new Supervisor("Supervisor " + String.valueOf(index++)));
-        }
-        index = 0;
-        while (index < cantOp) {
-            operators.add(new Operator("Operator " + String.valueOf(index++)));
-        }
+  public void callHandler(Call call) {
+    try {
+      Employee employee = employeeBusiness.getAvailableEmployee();
+      dispatchCall(employee, call);
+    } catch (CallCenterException ex) {
+      logger.info(ex.getMessage());
+      waitingCalls.add(call);
     }
-
-    public void callHandler(Call call) throws CallCenterException {
-
-        Employee availableEmployee =
-    }
+  }
 }
